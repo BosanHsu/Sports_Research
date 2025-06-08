@@ -1,5 +1,6 @@
 # Fantasy Baseball Draft with Reinforcement Learning
 
+### Honored by INFORMS with selection for its poster competition, highlighting the project’s contribution to AI-driven resource optimization and sports analytics.
 This project builds a smart fantasy baseball draft simulator using Reinforcement Learning (RL). It trains a Deep Q-Network (DQN) agent to make better draft decisions than traditional strategies by simulating hundreds of fantasy drafts and learning from the results.
 
 ## 📘 What This Project Does
