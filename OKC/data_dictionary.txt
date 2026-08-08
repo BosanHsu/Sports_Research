@@ -1,0 +1,90 @@
+OKC Thunder Data Scientist Hiring Project Data Dictionary
+
+# ---------------------------------------------------------
+# schedule.csv
+# 
+# This dataset has schedule information, including
+	The two teams, who is home, and the date that the game was played.  
+# There are two rows for each game, one from the perspective of each participating team.    
+# ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# schedule_24_partial.csv
+#
+# This dataset has 80 games for OKC and 80 games for DEN for the 2024-25 season. 
+# There are intentionally two games held out during December, as the initial version
+# of the NBA schedule will leave those off due to unknown matchups for the NBA Cup.  
+# ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# locations.csv
+#
+# This dataset has one row for each team, with latitude, longitude, and timezone data for their home arena. 
+# LAC and LAL have the same location in this set, you do not need to find the coordinates for the new Intuit Dome.
+# ---------------------------------------------------------
+
+# ---------------------------------------------------------
+# team_game_data.csv
+# 
+# This dataset has team game statistical counting stats.
+# Rows are all from the perspective of the offensive team. Defensive stats must be calculated by using a team's defensive row.
+# There is one row for each team's offensive stats, meaning two rows for each game (one for each team)
+# ---------------------------------------------------------
+
+
+### SEASONS COVERED ###
+
+Both schedule and game data cover the 2014-15 to 2023-24 regular seasons. You are also provided an 80-game initial version of OKC and DEN's 2024-25 season schedule.  
+
+# Explanations for select columns
+
+Most columns should have self explanatory names. Below are select columns that merit additional explanation. All stats are team stats from the perspective of the offensive team.
+
+season: The starting season of an NBA calendar year. The 2023 season is the 2023-24 NBA season. This means that the 2024 playoffs took place during the 2023 season (i.e. 2023-24 season).
+
+gametype: An indicator for whether the game was from the regular season (gametype = 2) or playoffs (gametype = 4).
+
+reboffensive: the number of offensive rebounds gathered by the offensive team. Note that this includes "team" rebounds and thus should be >= the sum of individually credited offensive rebounds for the players on that team in that game. This is the numerator for team OREB%.
+
+rebdefensive: the number of defensive rebounds (both individual and team) conceded by the offense. This is NOT the number of defensive rebounds that the offensive team got. For example, if the row lists GSW on offense and NOP on defense, rebdefensive is the number of rebounds that NOP gathered when GSW was on offense and NOP was on defense. This is the numerator for team DREB%.
+
+reboundchance: An opportunity for a rebound when the off_team was on offense and the def_team was on defense. This is the denominator for team REB% and includes both individual and team rebounds.
+
+stealsagainst: the number of times the defensive team stole the ball from the offensive team.
+
+turnovers: the number of turnovers committed by the offense.
+
+blocksagainst: the number of times the offensive team was blocked by the defensive team.
+
+offensivefouls: the number of offensive fouls committed by the offense.
+
+shotattempts: The total number of shots plus shooting fouls drawn by the team. It is the appropriate denominator for the efficiency measure points per attempt (shotattemptpoints/shotattempts). This measure is roughly equal to 2*TS% and can be used in situations when you would normally use TS%.
+
+shotattemptpoints: The total number of points scored on FGA + shooting foul FT points. It does not include points from off ball foul FT and other non-SF free throws (like technical foul shots). It is the numerator for PPA.
+
+
+### Common Advanced Stat Definitions ###
+
+Here are a few definitions of common measures that you may want to use:
+
+PPA = shotattemptpoints/shotattempts
+
+AST% = assists/teamfgmade
+
+OREB% = reboffensive/reboundchance
+
+DREB% = rebdefensive/reboundchance
+
+TOV% = turnovers/(shotattempts + turnovers) [Note that this is sometimes alternatively defined as turnovers/(possessions/100)]
+
+STL% = steals/defensivepossessions
+
+BLK% = blocks/opponentteamfg2attempted
+
+ORTG = points/(possessions/100)
+
+DRTG = points allowed/(defensive possessions/100) [Same as ORTG calculation but for the defensive team]
+
+NET RTG = ORTG - DRTG
+
+

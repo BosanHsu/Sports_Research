@@ -1,0 +1,357 @@
+<!doctype html><html><head><meta charset='utf-8'/>
+<title>Schedule Dashboard (v7)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<style>
+  :root { --fg:#111827; --muted:#6b7280; --card:#fff; --border:#e5e7eb;
+          --near:#93c5fd; --mid:#60a5fa; --far:#2563eb; }
+  body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f8fafc;color:var(--fg);margin:0;padding:24px;}
+  .row{display:flex;gap:16px;align-items:stretch;flex-wrap:wrap;}
+  .col{flex:1;min-width:320px}
+  .controls{display:flex;gap:12px;margin-bottom:16px;align-items:center;flex-wrap:wrap}
+  .controls select{padding:6px 10px;border-radius:10px;border:1px solid var(--border);background:#fff;}
+  .pill{display:inline-flex;gap:8px;align-items:center}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px 14px 6px 14px;box-shadow:0 2px 10px rgba(0,0,0,.04);}
+  #info{font-size:13.5px;margin:6px 2px 10px 2px;color:var(--muted);}
+  .legend{margin:8px 2px 0 2px;font-size:12.5px;color:var(--muted);}
+  .swatch{display:inline-block;width:10px;height:10px;border-radius:3px;margin:0 6px 0 12px;vertical-align:-1px;}
+  label.cb{user-select:none; cursor:pointer; font-size:13px;}
+  label.cb input{vertical-align:-2px; margin-right:6px;}
+</style>
+</head><body>
+
+<div class='controls'>
+  <label>Team:
+    <select id='teamSel'><option>OKC</option><option>DEN</option></select>
+  </label>
+  <label>Month:
+    <select id='monthSel'></select>
+  </label>
+
+  <!-- Filters -->
+  <div class="pill">
+    <label class="cb"><input type="checkbox" id="f_rest" checked> Rest days</label>
+  </div>
+
+  <span style="border-left:1px solid var(--border);height:18px"></span>
+
+  <div class="pill">
+    <span>X in Y:</span>
+    <label class="cb"><input type="checkbox" id="f_x14" checked> ● 3-in-4</label>
+    <label class="cb"><input type="checkbox" id="f_x15" checked> ▲ 3-in-5</label>
+    <label class="cb"><input type="checkbox" id="f_x16" checked> ★ 4-in-6</label>
+  </div>
+
+  <span style="border-left:1px solid var(--border);height:18px"></span>
+
+  <div class="pill">
+    <label class="cb"><input type="checkbox" id="f_tz" checked> Δ Time Zone</label>
+  </div>
+
+  <span style="border-left:1px solid var(--border);height:18px"></span>
+
+  <div class="pill">
+    <label class="cb"><input type="checkbox" id="f_travel" checked> Travel bars</label>
+    <span class='swatch' style='background:var(--near)'></span>near
+    <span class='swatch' style='background:var(--mid)'></span>mid
+    <span class='swatch' style='background:var(--far)'></span>far
+  </div>
+</div>
+
+<div class='row'>
+  <div class='col card'>
+    <div id='calendar' style='height:580px;'></div>
+    <div class='legend' id="calLegend">
+      Cell = Team rest (0=red, 1=yellow, 2+=green). Markers: ● 3‑in‑4, ▲ 3‑in‑5, ★ 4‑in‑6.
+      <br/>Δ Time Zone: 0, +1, −1, ±2
+    </div>
+    <div id='info'></div>
+  </div>
+  <div class='col card'>
+    <div id='bars' style='height:580px;'></div>
+  </div>
+</div>
+
+<!-- Inject data from Python -->
+<script>
+const REST_BG = [
+  [0.00, '#fee2e2'], [0.33, '#fee2e2'],  // 0d (red)
+  [0.34, '#fef3c7'], [0.66, '#fef3c7'],  // 1d (yellow)
+  [0.67, '#dcfce7'], [1.00, '#dcfce7']   // 2+d (green)
+];
+function restBgValue(n){
+  if(n==null) return 0.83;
+  if(n>=2)   return 0.83;
+  if(n===1)  return 0.50;
+  return 0.16;
+}
+const DATA_BY_TEAM = {"OKC": [{"date": "2024-10-24", "opponent": "DEN", "is_home": false, "our_rest": null, "travel_km": 0.0, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 1, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-10-26", "opponent": "CHI", "is_home": false, "our_rest": 1, "travel_km": 1475.2365254971658, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2024-10-27", "opponent": "ATL", "is_home": true, "our_rest": 0, "travel_km": 1111.8193769290913, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2024-10-30", "opponent": "SAS", "is_home": true, "our_rest": 2, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-01", "opponent": "POR", "is_home": false, "our_rest": 1, "travel_km": 2389.1763135109422, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-2", "badges": ""}, {"date": "2024-11-02", "opponent": "LAC", "is_home": false, "our_rest": 0, "travel_km": 1331.0619544656363, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2024-11-04", "opponent": "ORL", "is_home": true, "our_rest": 1, "travel_km": 1898.9610410719042, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "+2", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-11-06", "opponent": "DEN", "is_home": false, "our_rest": 1, "travel_km": 813.5430773265962, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "-1", "badges": "3-in-5 / 4-in-6"}, {"date": "2024-11-08", "opponent": "HOU", "is_home": true, "our_rest": 1, "travel_km": 813.5430773265962, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}, {"date": "2024-11-10", "opponent": "GSW", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-11", "opponent": "LAC", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-11-13", "opponent": "NOP", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-11-15", "opponent": "PHX", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2024-11-17", "opponent": "DAL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-19", "opponent": "SAS", "is_home": false, "our_rest": 1, "travel_km": 676.7756943654268, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-20", "opponent": "POR", "is_home": true, "our_rest": 0, "travel_km": 676.7756943654268, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-11-25", "opponent": "SAC", "is_home": false, "our_rest": 4, "travel_km": 2150.965415462684, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-2", "badges": ""}, {"date": "2024-11-27", "opponent": "GSW", "is_home": false, "our_rest": 1, "travel_km": 119.0914840814909, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-11-29", "opponent": "LAL", "is_home": false, "our_rest": 1, "travel_km": 555.9704335583473, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-12-01", "opponent": "HOU", "is_home": false, "our_rest": 1, "travel_km": 2209.3632697065273, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+2", "badges": "3-in-5"}, {"date": "2024-12-03", "opponent": "UTA", "is_home": true, "our_rest": 1, "travel_km": 666.4093185203822, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-12-05", "opponent": "TOR", "is_home": false, "our_rest": 1, "travel_km": 1795.6305656121658, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}, {"date": "2024-12-07", "opponent": "NOP", "is_home": false, "our_rest": 1, "travel_km": 1792.8835440113019, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2024-12-19", "opponent": "ORL", "is_home": false, "our_rest": 11, "travel_km": 858.079654564781, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 1, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2024-12-20", "opponent": "MIA", "is_home": false, "our_rest": 0, "travel_km": 328.69194260932414, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-12-23", "opponent": "WAS", "is_home": true, "our_rest": 2, "travel_km": 1972.1433101152058, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2024-12-26", "opponent": "IND", "is_home": false, "our_rest": 2, "travel_km": 1107.8426079394014, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2024-12-28", "opponent": "CHA", "is_home": false, "our_rest": 1, "travel_km": 688.7034288007742, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-12-29", "opponent": "MEM", "is_home": true, "our_rest": 0, "travel_km": 1510.9531727847693, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5"}, {"date": "2024-12-31", "opponent": "MIN", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-02", "opponent": "LAC", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-01-03", "opponent": "NYK", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-05", "opponent": "BOS", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-08", "opponent": "CLE", "is_home": false, "our_rest": 2, "travel_km": 1529.1538380153397, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2025-01-10", "opponent": "NYK", "is_home": false, "our_rest": 1, "travel_km": 649.611703443185, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-01-12", "opponent": "WAS", "is_home": false, "our_rest": 1, "travel_km": 330.5400607057068, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-14", "opponent": "PHI", "is_home": false, "our_rest": 1, "travel_km": 194.1185678485673, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-16", "opponent": "CLE", "is_home": true, "our_rest": 1, "travel_km": 2021.3160764849936, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2025-01-17", "opponent": "DAL", "is_home": false, "our_rest": 0, "travel_km": 304.24962892485684, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-19", "opponent": "BKN", "is_home": true, "our_rest": 1, "travel_km": 304.24962892485684, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-22", "opponent": "UTA", "is_home": true, "our_rest": 2, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-01-23", "opponent": "DAL", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-26", "opponent": "POR", "is_home": false, "our_rest": 2, "travel_km": 2389.1763135109422, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-2", "badges": "3-in-5"}, {"date": "2025-01-29", "opponent": "GSW", "is_home": false, "our_rest": 2, "travel_km": 863.5801574797273, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-02-01", "opponent": "SAC", "is_home": true, "our_rest": 2, "travel_km": 2227.9673418448356, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+2", "badges": ""}, {"date": "2025-02-03", "opponent": "MIL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-02-05", "opponent": "PHX", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-02-07", "opponent": "TOR", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-02-08", "opponent": "MEM", "is_home": false, "our_rest": 0, "travel_km": 678.2333476422194, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-10", "opponent": "NOP", "is_home": true, "our_rest": 1, "travel_km": 678.2333476422194, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-12", "opponent": "MIA", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-02-13", "opponent": "MIN", "is_home": false, "our_rest": 0, "travel_km": 1117.2275770235233, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-21", "opponent": "UTA", "is_home": false, "our_rest": 7, "travel_km": 1584.18591289061, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 1, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-1", "badges": ""}, {"date": "2025-02-23", "opponent": "MIN", "is_home": false, "our_rest": 1, "travel_km": 1584.18591289061, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2025-02-24", "opponent": "MIN", "is_home": true, "our_rest": 0, "travel_km": 1117.2275770235233, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2025-02-26", "opponent": "BKN", "is_home": false, "our_rest": 1, "travel_km": 2133.435753945515, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "+1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-28", "opponent": "ATL", "is_home": false, "our_rest": 1, "travel_km": 1200.326711246815, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-03-02", "opponent": "SAS", "is_home": false, "our_rest": 1, "travel_km": 1412.8989028011226, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2025-03-03", "opponent": "HOU", "is_home": true, "our_rest": 0, "travel_km": 676.7756943654268, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-05", "opponent": "MEM", "is_home": false, "our_rest": 1, "travel_km": 678.2333476422194, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-07", "opponent": "POR", "is_home": true, "our_rest": 1, "travel_km": 678.2333476422194, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-03-09", "opponent": "DEN", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-03-10", "opponent": "DEN", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-12", "opponent": "BOS", "is_home": false, "our_rest": 1, "travel_km": 2402.3640371533947, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "+1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-15", "opponent": "DET", "is_home": false, "our_rest": 2, "travel_km": 984.6364130456426, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-03-16", "opponent": "MIL", "is_home": false, "our_rest": 0, "travel_km": 404.8994208179393, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2025-03-19", "opponent": "PHI", "is_home": true, "our_rest": 2, "travel_km": 1178.913771740545, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-03-21", "opponent": "CHA", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-03-23", "opponent": "LAC", "is_home": false, "our_rest": 1, "travel_km": 1898.9610410719042, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-2", "badges": "3-in-5"}, {"date": "2025-03-25", "opponent": "SAC", "is_home": false, "our_rest": 1, "travel_km": 581.6141577116587, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-03-27", "opponent": "MEM", "is_home": true, "our_rest": 1, "travel_km": 2150.965415462684, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+2", "badges": "3-in-5"}, {"date": "2025-03-29", "opponent": "IND", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-03-31", "opponent": "CHI", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-04-02", "opponent": "DET", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-04-04", "opponent": "HOU", "is_home": false, "our_rest": 1, "travel_km": 666.4093185203822, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-04-06", "opponent": "LAL", "is_home": true, "our_rest": 1, "travel_km": 666.4093185203822, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-04-08", "opponent": "LAL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-04-09", "opponent": "PHX", "is_home": false, "our_rest": 0, "travel_km": 1352.0334416494093, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-04-11", "opponent": "UTA", "is_home": false, "our_rest": 1, "travel_km": 814.3565115047714, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-04-13", "opponent": "NOP", "is_home": false, "our_rest": 1, "travel_km": 2305.8949625261835, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "+1", "badges": "3-in-5 / 4-in-6"}], "DEN": [{"date": "2024-10-24", "opponent": "OKC", "is_home": true, "our_rest": null, "travel_km": 0.0, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 1, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-10-26", "opponent": "LAC", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-10-28", "opponent": "TOR", "is_home": false, "our_rest": 1, "travel_km": 2162.3783829769227, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+2", "badges": "3-in-5"}, {"date": "2024-10-29", "opponent": "BKN", "is_home": false, "our_rest": 0, "travel_km": 553.6682125313125, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-11-01", "opponent": "MIN", "is_home": false, "our_rest": 2, "travel_km": 1640.2594659132735, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2024-11-02", "opponent": "UTA", "is_home": true, "our_rest": 0, "travel_km": 1124.1015850203564, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "-1", "badges": "3-in-5 / 4-in-6"}, {"date": "2024-11-04", "opponent": "TOR", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2024-11-06", "opponent": "OKC", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2024-11-08", "opponent": "MIA", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-10", "opponent": "DAL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-15", "opponent": "NOP", "is_home": false, "our_rest": 4, "travel_km": 1740.0944098671907, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2024-11-17", "opponent": "MEM", "is_home": false, "our_rest": 1, "travel_km": 577.0213468340678, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2024-11-19", "opponent": "MEM", "is_home": false, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-11-22", "opponent": "DAL", "is_home": true, "our_rest": 2, "travel_km": 1414.2876189233991, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-1", "badges": ""}, {"date": "2024-11-23", "opponent": "LAL", "is_home": false, "our_rest": 0, "travel_km": 1336.9729075973453, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2024-11-25", "opponent": "NYK", "is_home": true, "our_rest": 1, "travel_km": 1336.9729075973453, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "+1", "badges": "3-in-4 / 3-in-5"}, {"date": "2024-11-27", "opponent": "UTA", "is_home": false, "our_rest": 1, "travel_km": 595.6712463764067, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2024-12-01", "opponent": "LAC", "is_home": false, "our_rest": 3, "travel_km": 935.0457581075054, "x1_in_4": 1, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-1", "badges": ""}, {"date": "2024-12-03", "opponent": "GSW", "is_home": true, "our_rest": 1, "travel_km": 1336.9729075973453, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2024-12-05", "opponent": "CLE", "is_home": false, "our_rest": 1, "travel_km": 1971.6947491653882, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+2", "badges": "3-in-5"}, {"date": "2024-12-07", "opponent": "WAS", "is_home": false, "our_rest": 1, "travel_km": 490.4042520058147, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2024-12-08", "opponent": "ATL", "is_home": false, "our_rest": 0, "travel_km": 873.1054698798946, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-12-19", "opponent": "POR", "is_home": false, "our_rest": 10, "travel_km": 3488.508868880879, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 1, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-3", "badges": ""}, {"date": "2024-12-22", "opponent": "NOP", "is_home": false, "our_rest": 2, "travel_km": 3314.4069362291157, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+2", "badges": ""}, {"date": "2024-12-23", "opponent": "PHX", "is_home": true, "our_rest": 0, "travel_km": 1740.0944098671907, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2024-12-25", "opponent": "PHX", "is_home": false, "our_rest": 1, "travel_km": 942.0959716238185, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2024-12-27", "opponent": "CLE", "is_home": true, "our_rest": 1, "travel_km": 942.0959716238185, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2024-12-28", "opponent": "DET", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2024-12-30", "opponent": "UTA", "is_home": false, "our_rest": 1, "travel_km": 595.6712463764067, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-01", "opponent": "ATL", "is_home": true, "our_rest": 1, "travel_km": 595.6712463764067, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-01-03", "opponent": "SAS", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-04", "opponent": "SAS", "is_home": false, "our_rest": 0, "travel_km": 1294.7828530691015, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "+1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-07", "opponent": "BOS", "is_home": true, "our_rest": 2, "travel_km": 1294.7828530691015, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-1", "badges": "3-in-5"}, {"date": "2025-01-08", "opponent": "LAC", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-01-10", "opponent": "BKN", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2025-01-12", "opponent": "DAL", "is_home": false, "our_rest": 1, "travel_km": 1066.152339451909, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "+1", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-01-14", "opponent": "DAL", "is_home": false, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-15", "opponent": "HOU", "is_home": true, "our_rest": 0, "travel_km": 1066.152339451909, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-17", "opponent": "MIA", "is_home": false, "our_rest": 1, "travel_km": 2777.2274372938014, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "+2", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-01-19", "opponent": "ORL", "is_home": false, "our_rest": 1, "travel_km": 328.69194260932414, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-01-21", "opponent": "PHI", "is_home": true, "our_rest": 1, "travel_km": 2494.5370677757924, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "-2", "badges": "3-in-5"}, {"date": "2025-01-23", "opponent": "SAC", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-25", "opponent": "MIN", "is_home": false, "our_rest": 1, "travel_km": 1124.1015850203564, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}, {"date": "2025-01-27", "opponent": "CHI", "is_home": false, "our_rest": 1, "travel_km": 568.4347595670457, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-01-29", "opponent": "NYK", "is_home": false, "our_rest": 1, "travel_km": 1148.206381537663, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}, {"date": "2025-01-31", "opponent": "PHI", "is_home": false, "our_rest": 1, "travel_km": 137.47864385457567, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-02-01", "opponent": "CHA", "is_home": false, "our_rest": 0, "travel_km": 720.7069808081599, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-03", "opponent": "NOP", "is_home": true, "our_rest": 1, "travel_km": 2183.6936595222273, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "-2", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-05", "opponent": "NOP", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-02-06", "opponent": "ORL", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-08", "opponent": "PHX", "is_home": false, "our_rest": 1, "travel_km": 942.0959716238185, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-02-10", "opponent": "POR", "is_home": true, "our_rest": 1, "travel_km": 942.0959716238185, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-02-12", "opponent": "POR", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-02-20", "opponent": "CHA", "is_home": true, "our_rest": 7, "travel_km": 0.0, "x1_in_4": 1, "x2_in_5": 1, "x3_in_6": 1, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-02-22", "opponent": "LAL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-02-24", "opponent": "IND", "is_home": false, "our_rest": 1, "travel_km": 1608.55817511001, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+2", "badges": "3-in-5"}, {"date": "2025-02-27", "opponent": "MIL", "is_home": false, "our_rest": 2, "travel_km": 393.12697278323645, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-1", "badges": ""}, {"date": "2025-02-28", "opponent": "DET", "is_home": false, "our_rest": 0, "travel_km": 404.8994208179393, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}, {"date": "2025-03-02", "opponent": "BOS", "is_home": false, "our_rest": 1, "travel_km": 984.6364130456426, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5"}, {"date": "2025-03-05", "opponent": "SAC", "is_home": true, "our_rest": 2, "travel_km": 2842.060293024499, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-2", "badges": ""}, {"date": "2025-03-07", "opponent": "PHX", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-03-09", "opponent": "OKC", "is_home": false, "our_rest": 1, "travel_km": 813.5430773265962, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}, {"date": "2025-03-10", "opponent": "OKC", "is_home": false, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-12", "opponent": "MIN", "is_home": true, "our_rest": 1, "travel_km": 813.5430773265962, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-14", "opponent": "LAL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-03-15", "opponent": "WAS", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-17", "opponent": "GSW", "is_home": false, "our_rest": 1, "travel_km": 1520.510138579082, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-19", "opponent": "LAL", "is_home": false, "our_rest": 1, "travel_km": 555.9704335583473, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-03-21", "opponent": "POR", "is_home": false, "our_rest": 1, "travel_km": 1331.0619544656363, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "0", "badges": "3-in-5"}, {"date": "2025-03-23", "opponent": "HOU", "is_home": false, "our_rest": 1, "travel_km": 2952.2040860825045, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+2", "badges": "3-in-5"}, {"date": "2025-03-24", "opponent": "CHI", "is_home": true, "our_rest": 0, "travel_km": 1416.7012298631298, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-26", "opponent": "MIL", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 4, "m1": true, "m2": true, "m3": true, "markers": "●▲★", "tz_delta_str": "0", "badges": "3-in-4 / 3-in-5 / 4-in-6"}, {"date": "2025-03-28", "opponent": "UTA", "is_home": true, "our_rest": 1, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "0", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-04-01", "opponent": "MIN", "is_home": true, "our_rest": 3, "travel_km": 0.0, "x1_in_4": 1, "x2_in_5": 2, "x3_in_6": 2, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-04-02", "opponent": "SAS", "is_home": true, "our_rest": 0, "travel_km": 0.0, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "0", "badges": ""}, {"date": "2025-04-04", "opponent": "GSW", "is_home": false, "our_rest": 1, "travel_km": 1520.510138579082, "x1_in_4": 3, "x2_in_5": 3, "x3_in_6": 3, "m1": true, "m2": true, "m3": false, "markers": "●▲", "tz_delta_str": "-1", "badges": "3-in-4 / 3-in-5"}, {"date": "2025-04-06", "opponent": "IND", "is_home": true, "our_rest": 1, "travel_km": 1520.510138579082, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 4, "m1": false, "m2": true, "m3": true, "markers": "▲★", "tz_delta_str": "+1", "badges": "3-in-5 / 4-in-6"}, {"date": "2025-04-09", "opponent": "SAC", "is_home": false, "our_rest": 2, "travel_km": 1425.6941710855424, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "-1", "badges": ""}, {"date": "2025-04-11", "opponent": "MEM", "is_home": true, "our_rest": 1, "travel_km": 1425.6941710855424, "x1_in_4": 2, "x2_in_5": 2, "x3_in_6": 3, "m1": false, "m2": false, "m3": false, "markers": "", "tz_delta_str": "+1", "badges": ""}, {"date": "2025-04-13", "opponent": "HOU", "is_home": false, "our_rest": 1, "travel_km": 1416.7012298631298, "x1_in_4": 2, "x2_in_5": 3, "x3_in_6": 3, "m1": false, "m2": true, "m3": false, "markers": "▲", "tz_delta_str": "+1", "badges": "3-in-5"}]};
+const MONTHS_BY_TEAM = {"OKC": [{"year": 2024, "month": 10, "label": "Oct 2024", "key": "2024-10"}, {"year": 2024, "month": 11, "label": "Nov 2024", "key": "2024-11"}, {"year": 2024, "month": 12, "label": "Dec 2024", "key": "2024-12"}, {"year": 2025, "month": 1, "label": "Jan 2025", "key": "2025-01"}, {"year": 2025, "month": 2, "label": "Feb 2025", "key": "2025-02"}, {"year": 2025, "month": 3, "label": "Mar 2025", "key": "2025-03"}, {"year": 2025, "month": 4, "label": "Apr 2025", "key": "2025-04"}], "DEN": [{"year": 2024, "month": 10, "label": "Oct 2024", "key": "2024-10"}, {"year": 2024, "month": 11, "label": "Nov 2024", "key": "2024-11"}, {"year": 2024, "month": 12, "label": "Dec 2024", "key": "2024-12"}, {"year": 2025, "month": 1, "label": "Jan 2025", "key": "2025-01"}, {"year": 2025, "month": 2, "label": "Feb 2025", "key": "2025-02"}, {"year": 2025, "month": 3, "label": "Mar 2025", "key": "2025-03"}, {"year": 2025, "month": 4, "label": "Apr 2025", "key": "2025-04"}]};
+const Q_NEAR=778.9, Q_FAR=1421.9;
+</script>
+
+<script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+<script>
+// ===== helpers =====
+function getMonthGrid(y,m){
+  const first=new Date(Date.UTC(y,m-1,1));
+  const firstMon0=(first.getUTCDay()+6)%7;      // Mon=0
+  const firstCol=(firstMon0+1)%7;               // Sun=0
+  const start=new Date(Date.UTC(y,m-1,1-firstCol));
+  const cells=[];
+  for(let i=0;i<35;i++){
+    const d=new Date(start); d.setUTCDate(start.getUTCDate()+i);
+    cells.push({x:i%7, y:Math.floor(i/7), iso:d.toISOString().slice(0,10), inMonth:(d.getUTCMonth()+1)===m});
+  }
+  return cells;
+}
+function restInfo(n){ if(n==null||isNaN(n)) return '—'; if(n>=2) return '2+'; return String(n); }
+function bucketDist(d){ if(!d || isNaN(d)) return 'near'; if(d<Q_NEAR) return 'near'; if(d<Q_FAR) return 'mid'; return 'far'; }
+function colorDist(c){ return c==='near'?'var(--near)':(c==='mid'?'var(--mid)':'var(--far)'); }
+function tzStr(v){ return v || '0'; }
+function getFilters(){
+  const g = id => !!document.getElementById(id)?.checked;
+  return {
+    rest: g('f_rest'),
+    x14:  g('f_x14'),
+    x15:  g('f_x15'),
+    x16:  g('f_x16'),
+    tz:   g('f_tz'),
+    travel: g('f_travel')
+  };
+}
+
+// ===== Calendar =====
+// ===== Calendar =====
+function buildCalendarFigure(team,y,m){
+  const filters=getFilters();
+  const recs=DATA_BY_TEAM[team]||[];
+  const recByISO=Object.fromEntries(recs.map(r=>[r.date,r]));
+  const cells=getMonthGrid(y,m);
+
+  const z = Array.from({length:5}, ()=>Array(7).fill(NaN));
+  const cd=[]; for(let r=0;r<5;r++){ cd.push([]); }
+
+  const tx=[],ty=[],ttext=[], mx=[],my=[],mt=[], tzx=[],tzy=[],tztxt=[]; 
+  const dx_in=[],dy_in=[],dtext_in=[], dx_out=[],dy_out=[],dtext_out=[];
+
+  for(const cell of cells){
+    const dom=(new Date(cell.iso)).getUTCDate();
+    if(cell.inMonth){ dx_in.push(cell.x-0.38); dy_in.push(cell.y-0.38); dtext_in.push(String(dom)); }
+    else            { dx_out.push(cell.x-0.38); dy_out.push(cell.y-0.38); dtext_out.push(String(dom)); }
+
+    const rec=recByISO[cell.iso];
+    if(cell.inMonth && rec){
+      if(filters.rest){ z[cell.y][cell.x]=restBgValue(rec.our_rest); }
+      tx.push(cell.x); ty.push(cell.y); ttext.push((rec.is_home===false?'@':'')+rec.opponent);
+
+      // === 合併 X-in-Y 符號 ===
+      let sym="";
+      if(filters.x14 && rec.m1) sym += "●";
+      if(filters.x15 && rec.m2) sym += "▲";
+      if(filters.x16 && rec.m3) sym += "★";
+      if(sym){ mx.push(cell.x+0.30); my.push(cell.y-0.33); mt.push(sym); }
+
+      // === ΔTZ 在右下角 ===
+      if(filters.tz && rec.tz_delta_str !== "0"){
+        tzx.push(cell.x); // 右下角 x 偏移
+        tzy.push(cell.y + 0.33); // 右下角 y 偏移
+        tztxt.push("ΔTZ: " + rec.tz_delta_str);
+      }
+
+      cd[cell.y].push([cell.iso,1,rec.our_rest,rec.badges,rec.travel_km,rec.tz_delta_str]);
+    }else{
+      cd[cell.y].push([cell.iso,0,null,"",null,"0"]);
+    }
+  }
+
+  const traces = [];
+  if(filters.rest){
+    traces.push({
+      type:'heatmap', z, x:[0,1,2,3,4,5,6], y:[0,1,2,3,4],
+      zmin:0, zmax:1, colorscale:REST_BG, showscale:false,
+      hoverongaps:false, xgap:5, ygap:8,
+      customdata:cd,
+      hovertemplate:'%{customdata[0]}<br>Our rest: %{customdata[2]}<br>Travel: %{customdata[4]:,.0f} km<br>ΔTZ: %{customdata[5]}<extra></extra>'
+    });
+  }
+
+  // 日期
+  traces.push({type:'scatter',mode:'text',x:dx_out,y:dy_out,text:dtext_out,
+    textposition:'top left',hoverinfo:'skip',textfont:{size:11,color:'#9ca3af'}, cliponaxis:false});
+  traces.push({type:'scatter',mode:'text',x:dx_in ,y:dy_in ,text:dtext_in ,
+    textposition:'top left',hoverinfo:'skip',textfont:{size:11,color:'#374151'}, cliponaxis:false});
+
+  // 對手
+  traces.push({type:'scatter',mode:'text',x:tx,y:ty,text:ttext,hoverinfo:'skip',
+    textposition:'middle center',textfont:{size:12,color:'#111'}, cliponaxis:false});
+
+  // 合併的 X-in-Y 符號
+  if(mt.length){
+    traces.push({type:'scatter',mode:'text',x:mx,y:my,text:mt,hoverinfo:'skip',
+      textfont:{size:12,color:'#111'}, cliponaxis:false});
+  }
+
+  // ΔTZ 符號
+  if(tztxt.length){
+    traces.push({type:'scatter',mode:'text',x:tzx,y:tzy,text:tztxt,hoverinfo:'skip',
+      textfont:{size:10,color:'#111'}, textposition:'bottom right', cliponaxis:false});
+  }
+
+  const layout={
+    title:{text: team+' — Calendar', x:0, xanchor:'left', font:{size:18}},
+    xaxis:{tickmode:'array',tickvals:[0,1,2,3,4,5,6],ticktext:['Sun','Mon','Tue','Wed','Thu','Fri','Sat'],
+           range:[-0.6,6.6], showgrid:false,zeroline:false,showline:false,ticks:'',ticklen:0},
+    yaxis:{tickmode:'array',tickvals:[0,1,2,3,4],ticktext:['W1','W2','W3','W4','W5'],
+           range:[4.5,-0.5], showgrid:false,zeroline:false,showline:false,ticks:'',ticklen:0},
+    margin:{t:50,l:50,r:24,b:70}, showlegend:false, paper_bgcolor:'white',plot_bgcolor:'white',
+    annotations:[{
+      text:"Δ Time Zone: 0, +1, −1, ±2",
+      xref:'paper', yref:'paper', x:0, y:-0.18, showarrow:false,
+      font:{size:12,color:'#6b7280'}, align:'left'
+    }]
+  };
+  return {data:traces, layout};
+}
+
+
+// ===== Bars (stacked by distance bins; legend on the right) =====
+function buildBarsFigure(team,y,m){
+  const filters=getFilters();
+  const recs=(DATA_BY_TEAM[team]||[]).filter(r=>{
+    const d=new Date(r.date); return d.getUTCFullYear()===y && (d.getUTCMonth()+1)===m;
+  });
+
+  if(!filters.travel){
+    const legNear={type:'scatter',mode:'markers',x:[null],y:[null],marker:{size:10,color:'#93c5fd'},name:'near',hoverinfo:'skip'};
+    const legMid ={type:'scatter',mode:'markers',x:[null],y:[null],marker:{size:10,color:'#60a5fa'},name:'mid', hoverinfo:'skip'};
+    const legFar ={type:'scatter',mode:'markers',x:[null],y:[null],marker:{size:10,color:'#2563eb'},name:'far', hoverinfo:'skip'};
+    return {data:[legNear,legMid,legFar], layout:{
+      title:{text: team+' — Travel per game (km)', x:0,xanchor:'left',font:{size:18}},
+      yaxis:{tickformat:',.0f',gridcolor:'#eef2f7'}, xaxis:{gridcolor:'#f5f7fb'},
+      margin:{t:70,l:50,r:20,b:60}, paper_bgcolor:'white', plot_bgcolor:'white',
+      legend:{x:1,y:1,xanchor:'right',yanchor:'top',orientation:'h',bgcolor:'rgba(255,255,255,0.7)',
+        title:{text:'near < '+Math.round(Q_NEAR).toLocaleString()+' km • mid < '+Math.round(Q_FAR).toLocaleString()+' km • far ≥ '+Math.round(Q_FAR).toLocaleString()+' km'}}
+    }};
+  }
+
+  const x=[], yNear=[], yMid=[], yFar=[], tNear=[], tMid=[], tFar=[];
+  recs.forEach(r=>{
+    const cat=bucketDist(r.travel_km);
+    const label=(r.is_home===false?'@':'')+r.opponent+' ('+Math.round(r.travel_km).toLocaleString()+' km, '+cat+')';
+    x.push(r.date);
+    yNear.push(cat==='near'?r.travel_km:0); tNear.push(label);
+    yMid .push(cat==='mid' ?r.travel_km:0); tMid .push(label);
+    yFar .push(cat==='far' ?r.travel_km:0); tFar .push(label);
+  });
+
+  const data=[];
+  data.push({type:'bar',name:'near',x, y:yNear, text:tNear, marker:{color:'#93c5fd'}, hovertemplate:'%{x}<br>%{text}<extra></extra>'});
+  data.push({type:'bar',name:'mid', x, y:yMid,  text:tMid,  marker:{color:'#60a5fa' }, hovertemplate:'%{x}<br>%{text}<extra></extra>'});
+  data.push({type:'bar',name:'far', x, y:yFar,  text:tFar,  marker:{color:'#2563eb' }, hovertemplate:'%{x}<br>%{text}<extra></extra>'});
+
+  const layout={
+    barmode:'stack',
+    title:{text: team+' — Travel per game (km)', x:0,xanchor:'left',font:{size:18}},
+    yaxis:{tickformat:',.0f',gridcolor:'#eef2f7'}, xaxis:{gridcolor:'#f5f7fb'},
+    margin:{t:70,l:50,r:20,b:60}, paper_bgcolor:'white', plot_bgcolor:'white',
+    legend:{x:1,y:1,xanchor:'right',yanchor:'top',orientation:'h',bgcolor:'rgba(255,255,255,0.7)',
+      title:{text:'near < '+Math.round(Q_NEAR).toLocaleString()+' km • mid < '+Math.round(Q_FAR).toLocaleString()+' km • far ≥ '+Math.round(Q_FAR).toLocaleString()+' km'}}
+  };
+  return {data, layout};
+}
+
+// ===== Interaction =====
+function highlightCalendarCell(gd,dateISO){
+  const cd=gd.data[0].customdata; let row=-1,col=-1;
+  for(let r=0;r<cd.length;r++){ for(let c=0;c<cd[r].length;c++){ if(cd[r][c][0]===dateISO){ row=r; col=c; break; } } if(row>=0) break; }
+  const shapes=[]; if(row>=0&&col>=0){ shapes.push({type:'rect',xref:'x',yref:'y',x0:col-0.5,x1:col+0.5,y0:row-0.5,y1:row+0.5,line:{width:3,color:'#111'}}); }
+  Plotly.relayout(gd,{shapes});
+}
+function highlightBar(gd,dateISO){
+  const idx=(gd.data[0].x||[]).indexOf(dateISO), shapes=[];
+  if(idx>=0){ const x=gd.data[0].x[idx]; shapes.push({type:'line',xref:'x',yref:'paper',x0:x,x1:x,y0:0,y1:1,line:{width:3,color:'#111'}}); }
+  Plotly.relayout(gd,{shapes});
+}
+
+function currentTeam(){ return document.getElementById('teamSel').value; }
+function currentYM(){
+  const v=document.getElementById('monthSel').value||'';
+  const ps=v.split('-'); return {y:parseInt(ps[0]||'2000'), m:parseInt(ps[1]||'1')};
+}
+function refreshMonthOptions(){
+  const team=currentTeam();
+  let opts=(MONTHS_BY_TEAM && MONTHS_BY_TEAM[team]) ? MONTHS_BY_TEAM[team].slice() : [];
+  if(!opts.length && Array.isArray(DATA_BY_TEAM?.[team])) {
+    const seen=new Map();
+    for(const r of DATA_BY_TEAM[team]){
+      const d=new Date(r.date); if(isNaN(d)) continue;
+      const y=d.getUTCFullYear(), m=d.getUTCMonth()+1;
+      const key=y+'-'+String(m).padStart(2,'0');
+      const label=['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][m]+' '+y;
+      if(!seen.has(key)) seen.set(key,label);
+    }
+    opts=Array.from(seen, ([key,label])=>({year:+key.slice(0,4), month:+key.slice(5,7), key, label}))
+              .sort((a,b)=> a.year===b.year ? a.month-b.month : a.year-b.year);
+  }
+  const sel=document.getElementById('monthSel');
+  sel.innerHTML='';
+  for(const o of opts){ const op=document.createElement('option'); op.value=o.key; op.textContent=o.label; sel.appendChild(op); }
+  if(sel.options.length>0) sel.selectedIndex=0;
+}
+
+function renderAll(){
+  const team=currentTeam(); const ym=currentYM();
+
+  const calFig=buildCalendarFigure(team,ym.y,ym.m);
+  Plotly.newPlot('calendar', calFig.data, calFig.layout, {displayModeBar:false})
+    .then((calDiv)=>{
+      const recs=(DATA_BY_TEAM[team]||[]); const recByISO=Object.fromEntries(recs.map(r=>[r.date,r]));
+      calDiv.on('plotly_click',(ev)=>{
+        let iso=null;
+        if(ev.points && ev.points.length){
+          const p=ev.points[0];
+          if(p.data.type==='heatmap'){ const d=p.customdata; if(d && d[1]===1) iso=d[0]; }
+          else { const x=Math.round(p.x), y=Math.round(p.y); const d=calDiv.data[0].customdata[y][x]; if(d && d[1]===1) iso=d[0]; }
+        }
+        if(!iso) return;
+        const r=recByISO[iso];
+        document.getElementById('info').textContent =
+          r.date+'  vs '+r.opponent+' ( '+(r.is_home===false?'Away':'Home')+' )'
+          +'  |  Our rest: '+restInfo(r.our_rest)
+          +'  |  Travel: '+Math.round(r.travel_km).toLocaleString()+' km'
+          +'  |  TZ Δ: '+r.tz_delta_str;
+        highlightCalendarCell(calDiv, iso);
+        highlightBar(document.getElementById('bars'), iso);
+      });
+    });
+
+  const barFig=buildBarsFigure(team,ym.y,ym.m);
+  Plotly.newPlot('bars', barFig.data, barFig.layout, {displayModeBar:false})
+    .then((barsDiv)=>{
+      const recs=(DATA_BY_TEAM[team]||[]); const recByISO=Object.fromEntries(recs.map(r=>[r.date,r]));
+      barsDiv.on('plotly_click',(ev)=>{
+        const iso=ev.points?.[0]?.x; if(!iso) return;
+        const r=recByISO[iso];
+        document.getElementById('info').textContent =
+          r.date+'  vs '+r.opponent+' ( '+(r.is_home===false?'Away':'Home')+' )'
+          +'  |  Our rest: '+restInfo(r.our_rest)
+          +'  |  Travel: '+Math.round(r.travel_km).toLocaleString()+' km'
+          +'  |  TZ Δ: '+r.tz_delta_str;
+        highlightBar(barsDiv, iso);
+        highlightCalendarCell(document.getElementById('calendar'), iso);
+      });
+    });
+}
+
+// init + bindings
+document.addEventListener('DOMContentLoaded', ()=>{
+  try { refreshMonthOptions(); renderAll(); } catch(e){ console.error('init error:', e); }
+  document.getElementById('teamSel').addEventListener('change', ()=>{ refreshMonthOptions(); renderAll(); });
+  document.getElementById('monthSel').addEventListener('change', renderAll);
+  ['f_rest','f_x14','f_x15','f_x16','f_tz','f_travel'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.addEventListener('change', renderAll);
+  });
+});
+</script>
+</body></html>
