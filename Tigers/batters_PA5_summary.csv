@@ -1,0 +1,16 @@
+BatterId,PA,Pitches/PA,OBP,SLG,K%,BB%,H%,Two-Strike Reached %,Two-Strike Hit%,Two-Strike OBP,Early-PA %,Early-PA OBP,Tags
+2,5,4.2,0,0,80,0,0,20,0,0,40,0,grindy
+4,9,3.67,0.222,0.333,0,0,22.2,22.2,0,0,55.6,0.2,aggressive early
+7,5,4,0.4,0.5,20,0,40,40,50,0.5,40,0.5,"on-base hot, impact, 2S survive"
+13,9,4.22,0.222,0.8,33.3,11.1,11.1,11.1,0,0,11.1,1,"impact, grindy"
+14,5,3.4,0.4,1,20,0,40,40,50,0.5,60,0.333,"on-base hot, impact, aggressive early, 2S survive"
+17,5,5,0.4,0.333,20,20,20,60,0,0,20,1,"on-base hot, grindy"
+18,7,4.14,0.286,0.25,28.6,14.3,14.3,14.3,0,0,42.9,0,
+19,10,3.3,0.2,0.333,40,0,20,20,0,0,60,0.333,aggressive early
+20,5,3.6,0.2,0.8,0,0,20,40,50,0.5,60,0,"impact, aggressive early, 2S survive"
+21,10,3.6,0.6,0.625,10,10,50,10,0,0,50,0.8,"on-base hot, impact, aggressive early"
+24,10,3.1,0.4,0.4,0,0,40,20,50,0.5,70,0.429,"on-base hot, aggressive early, 2S survive"
+26,5,2.2,0,0,20,0,0,0,0,0,80,0,aggressive early
+29,5,3.8,0,0,40,0,0,40,0,0,20,0,
+33,5,4.6,0,0,40,0,0,20,0,0,40,0,grindy
+34,9,3.22,0.556,0.833,11.1,22.2,33.3,11.1,0,0,55.6,0.4,"on-base hot, impact, aggressive early"
